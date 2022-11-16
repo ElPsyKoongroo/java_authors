@@ -1,6 +1,6 @@
 use std::{
     io::{BufRead, Write},
-    path::PathBuf,
+    path::{Path, PathBuf},
     sync::RwLock,
 };
 
@@ -19,17 +19,17 @@ struct Args {
 
 static AUTHOR: RwLock<String> = RwLock::new(String::new());
 
-fn write_file_buffer(file_path: PathBuf, content: &str) {
-    let mut writter = std::io::BufWriter::new(std::fs::File::create(&file_path).unwrap());
-    match writter.write_all(content.as_bytes()) {
-        Ok(_) => println!("Author applied to {:?}", file_path),
-        Err(_) => {}
-    }
+fn write_file_buffer(file_path: &Path, content: &str) {
+    let mut writter = std::io::BufWriter::new(std::fs::File::create(file_path).unwrap());
+
+    if writter.write_all(content.as_bytes()).is_ok() {
+        println!("Author applied to {:?}", file_path);
+    };
 }
 
 fn add_author(file_buffer: &mut String) {
     *file_buffer = format!(
-"/**
+        "/**
 *
 * @author {}
 */\n",
@@ -37,30 +37,30 @@ fn add_author(file_buffer: &mut String) {
     ) + file_buffer;
 }
 
-fn check_author(file_path: PathBuf) {
-    let mut reader = std::io::BufReader::new(std::fs::File::open(&file_path).unwrap());
+fn check_author(file_path: &PathBuf) {
+    let mut reader = std::io::BufReader::new(std::fs::File::open(file_path).unwrap());
 
-    let mut file_buffer = "".to_owned();
-    let mut buffer = "".to_owned();
+    let mut file_buffer = String::new();
+    let mut buffer = String::new();
     let mut author_added = false;
     while reader.read_line(&mut buffer).unwrap() != 0 {
         if buffer.contains("@author") {
             file_buffer.push_str(&format!("* @author {}\n", *AUTHOR.try_read().unwrap()));
             author_added = true;
         } else {
-            file_buffer.push_str(&buffer)
+            file_buffer.push_str(&buffer);
         }
-        buffer.clear()
+        buffer.clear();
     }
 
     if !author_added {
-        add_author(&mut file_buffer)
+        add_author(&mut file_buffer);
     }
- 
+
     write_file_buffer(file_path, &file_buffer);
 }
 
-fn scan_folder(actual_path: PathBuf, actual_depth: u32) {
+fn scan_folder(actual_path: &Path, actual_depth: u32) {
     if actual_depth > MAX_DEPTH {
         return;
     }
@@ -71,9 +71,9 @@ fn scan_folder(actual_path: PathBuf, actual_depth: u32) {
         if file.file_type().unwrap().is_file()
             && file.file_name().to_str().unwrap().contains(".java")
         {
-            check_author(file.path());
+            check_author(&file.path());
         } else if file.file_type().unwrap().is_dir() {
-            scan_folder(file.path(), actual_depth + 1);
+            scan_folder(&file.path(), actual_depth + 1);
         }
     }
 }
@@ -83,7 +83,7 @@ fn main() {
     println!("Author: {}", args.author);
     let path = PathBuf::from(args.project_dir);
 
-    *AUTHOR.try_write().unwrap() = args.author.clone();
+    *AUTHOR.try_write().unwrap() = args.author;
 
-    scan_folder(path, 0)
+    scan_folder(&path, 0);
 }
